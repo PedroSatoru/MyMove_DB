@@ -68,10 +68,10 @@ def gerar_veiculos(qtd: int = 2):
     supabase.table('veiculo').insert(veiculos).execute()
 
 def gerar_alugueis(qtd: int = 2):
-    """Gera aluguéis vinculando entidades existentes"""
+    """Gera aluguéis vinculando entidades existentes, definindo o valor com base no tier do veículo e seguro."""
     clientes = supabase.table('cliente').select('id').execute().data
-    veiculos = supabase.table('veiculo').select('id, statusdisponibilidade').execute().data
-    seguros  = supabase.table('seguro').select('id').execute().data
+    veiculos = supabase.table('veiculo').select('id, statusdisponibilidade, tier').execute().data
+    seguros  = supabase.table('seguro').select('*').execute().data
     
     alugueis = []
     for _ in range(qtd):
@@ -84,7 +84,19 @@ def gerar_alugueis(qtd: int = 2):
         seguro  = random.choice(seguros)
         
         data_inicio = fake.date_between(start_date='-30d', end_date='today')
-        data_fim    = data_inicio + timedelta(days=random.randint(1, 14))
+        dias_aluguel = random.randint(1, 14)
+        data_fim = data_inicio + timedelta(days=dias_aluguel)
+        
+        # Define valores com base no tier
+        if veiculo['tier'] == 'Básico':
+            valor_dia = 80
+            seguro_valor = seguro.get('valorbasico', 0)
+        else:
+            valor_dia = 140
+            seguro_valor = seguro.get('valoravancado', 0)
+            
+        # O valor do aluguel é: (valor por dia * quantidade de dias) + valor fixo do seguro
+        valortotal = (valor_dia * dias_aluguel) + seguro_valor
         
         alugueis.append({
             'idcliente':   cliente['id'],
@@ -92,7 +104,7 @@ def gerar_alugueis(qtd: int = 2):
             'idseguro':    seguro['id'],
             'datainicio':  data_inicio.isoformat(),
             'datafim':     data_fim.isoformat(),
-            'valortotal':  round(random.uniform(200, 2000), 2),
+            'valortotal':  valortotal,
             'status':      random.choice(['Ativo', 'Concluído'])
         })
         
@@ -102,16 +114,19 @@ def gerar_alugueis(qtd: int = 2):
             .eq('id', veiculo['id']) \
             .execute()
     
-    supabase.table('aluguel').insert(alugueis).execute()
+    if alugueis:
+        supabase.table('aluguel').insert(alugueis).execute()
 
 def gerar_manutencoes(qtd: int = 1):
-    """Gera registros de manutenção"""
-    # Selecionar veículos (pode-se optar por filtrar somente os disponíveis, se desejar)
+    """Gera registros de manutenção e histórico de manutenção.
+       Verifica se há veículos disponíveis antes da inserção."""
     veiculos = supabase.table('veiculo').select('id').execute().data
+    if not veiculos:
+        print("Nenhum veículo encontrado para manutenção.")
+        return
     
-    # Lista auxiliar para relacionar veículo e dados da manutenção
-    manutencoes_data = []   # armazenará apenas os dados para inserir na tabela manutencao
-    relacionamentos = []    # armazenará tuplas (idveiculo, data_inicio) para o histórico
+    manutencoes_data = []   # dados para inserir na tabela manutencao
+    relacionamentos = []    # para relacionar cada manutenção ao veículo
     
     for _ in range(qtd):
         # Escolhe veículo aleatoriamente
@@ -121,11 +136,10 @@ def gerar_manutencoes(qtd: int = 1):
             .update({'statusdisponibilidade': 'Manutenção'}) \
             .eq('id', veiculo['id']) \
             .execute()
-
+        
         data_inicio = fake.date_between(start_date='-60d', end_date='today')
         data_fim    = data_inicio + timedelta(days=random.randint(1, 3))
         
-        # Prepara dados para manutenção, sem incluir idveiculo (pois a coluna não existe)
         manutencao = {
             'tipo':       random.choice(['preventiva', 'corretiva']),
             'datainicio': data_inicio.isoformat(),
@@ -134,10 +148,9 @@ def gerar_manutencoes(qtd: int = 1):
             'descricao':  fake.sentence()
         }
         manutencoes_data.append(manutencao)
-        # Armazena o id do veículo para vincular posteriormente com a manutenção inserida
         relacionamentos.append({
             'idveiculo': veiculo['id'],
-            'data_inicio': data_inicio.isoformat()  # usaremos essa data no histórico
+            'data_inicio': data_inicio.isoformat()
         })
     
     if not manutencoes_data:
@@ -145,16 +158,14 @@ def gerar_manutencoes(qtd: int = 1):
     
     result = supabase.table('manutencao').insert(manutencoes_data).execute()
     
-    # Considera que a ordem dos registros inseridos corresponde à dos itens em "relacionamentos"
+    # Registra o histórico de manutenção e libera os veículos após a manutenção
     for idx, m in enumerate(result.data):
         rel = relacionamentos[idx]
-        # Registra no histórico de manutenção vinculando o veículo à manutenção inserida
         supabase.table('historicomanutencao').insert({
             'idveiculo':    rel['idveiculo'],
             'idmanutencao': m['id'],
             'dataregistro': m['datainicio']
         }).execute()
-        # Após a manutenção, libera o veículo
         supabase.table('veiculo') \
             .update({'statusdisponibilidade': 'Disponível'}) \
             .eq('id', rel['idveiculo']) \
