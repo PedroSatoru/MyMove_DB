@@ -152,13 +152,13 @@ def gerar_alugueis(qtd: int = 2):
         valortotal = (valor_dia * (data_fim - data_inicio).days) + seguro_valor
 
         alugueis.append({
-            'idcliente': cliente['id'],
-            'idveiculo': veiculo['id'],
-            'idseguro': seguro['id'],
-            'datainicio': data_inicio.isoformat(),
-            'datafim': data_fim.isoformat(),
-            'valortotal': valortotal,
-            'status': status_aluguel
+            'idcliente':   cliente['id'],
+            'idveiculo':   veiculo['id'],
+            'idseguro':    seguro['id'],
+            'datainicio':  data_inicio.strftime("%Y-%m-%d"),
+            'datafim':     data_fim.strftime("%Y-%m-%d"),
+            'valortotal':  valortotal,
+            'status':      status_aluguel
         })
 
         if status_aluguel == 'Ativo':
@@ -234,14 +234,13 @@ def gerar_manutencoes(qtd: int = 1):
             status_local = 'Ativo'
         
         # Constrói o registro de manutenção incluindo o campo 'status'
-        # Utiliza strftime('%Y-%m-%d') para garantir que apenas a data seja armazenada
         manutencao = {
-            'tipo': random.choice(['preventiva', 'corretiva']),
-            'datainicio': data_inicio.isoformat(),
-            'datafim': data_fim.strftime("%Y-%m-%d"),
-            'custo': round(random.uniform(300, 5000), 2),
-            'descricao': fake.sentence(),
-            'status': status_local
+            'tipo':       random.choice(['preventiva', 'corretiva']),
+            'datainicio': data_inicio.strftime("%Y-%m-%d"),
+            'datafim':    data_fim.strftime("%Y-%m-%d"),
+            'custo':      round(random.uniform(300, 5000), 2),
+            'descricao':  fake.sentence(),
+            'status':     status_local
         }
         manutencoes_data.append(manutencao)
         relacionamentos.append({
@@ -258,10 +257,12 @@ def gerar_manutencoes(qtd: int = 1):
     
     for idx, m in enumerate(result.data):
         rel = relacionamentos[idx]
+        # Garante somente data (YYYY-MM-DD) no histórico
+        data_reg = datetime.fromisoformat(m['datainicio']).date().strftime("%Y-%m-%d")
         supabase.table('historicomanutencao').insert({
-            'idveiculo': rel['idveiculo'],
+            'idveiculo':    rel['idveiculo'],
             'idmanutencao': m['id'],
-            'dataregistro': m['datainicio']
+            'dataregistro': data_reg
         }).execute()
         # Libera o veículo após a manutenção
         supabase.table('veiculo') \
@@ -281,7 +282,8 @@ def gerar_tudo(nivel: int):
     # Novo mapeamento:
     qtd_clientes   = round(10 + (nivel - 1) * (50 - 10) / 4)
     qtd_veiculos   = round(5 + (nivel - 1) * (30 - 5) / 4)
-    qtd_manutencoes = round(0 + (nivel - 1) * (2 - 0) / 4)    # Máximo de 2 manutenções
+    # Agora varia de 1 até 10 manutenções
+    qtd_manutencoes = round(1 + (nivel - 1) * (10 - 1) / 4)
     qtd_alugueis   = round(2 + (nivel - 1) * (20 - 2) / 4)
     
     print(f"Gerando dados com nível {nivel}:")

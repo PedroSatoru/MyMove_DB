@@ -67,3 +67,11 @@ CREATE TABLE public.veiculo (
   tier public.tierveiculo NOT NULL DEFAULT 'Básico',
   CONSTRAINT veiculo_placa_key UNIQUE (placa)
 );
+
+-- após a criação das tabelas, converte timestamp para date
+ALTER TABLE public.manutencao
+  ALTER COLUMN datainicio TYPE date USING datainicio::date,
+  ALTER COLUMN datafim    TYPE date USING datafim::date;
+
+ALTER TABLE public.historicomanutencao
+  ALTER COLUMN dataregistro TYPE date USING dataregistro::date;
