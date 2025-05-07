@@ -45,6 +45,7 @@ CREATE TABLE public.manutencao (
   tipo text NOT NULL,
   datainicio timestamp with time zone NOT NULL,
   datafim timestamp with time zone NULL,
+  status text NULL DEFAULT 'Pendente',
   custo numeric(10,2) NOT NULL,
   descricao text NULL
 );
