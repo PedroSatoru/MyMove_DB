@@ -75,3 +75,9 @@ ALTER TABLE public.manutencao
 
 ALTER TABLE public.historicomanutencao
   ALTER COLUMN dataregistro TYPE date USING dataregistro::date;
+
+  -- após a criação das tabelas, converte timestamp para date
+ALTER TABLE public.aluguel
+  ALTER COLUMN datainicio TYPE date USING datainicio::date,
+  ALTER COLUMN datafim    TYPE date USING datafim::date;
+
