@@ -86,8 +86,19 @@ def gerar_veiculos(qtd: int = 2):
     else:
         print("Nenhum veículo gerado.")
 
+def gerar_mecanicos(qtd: int = 5):
+    """Gera mecânicos para atribuir às manutenções."""
+    mecanicos = []
+    for _ in range(qtd):
+        mecanicos.append({
+            'nome': fake.name(),
+            'especialidade': random.choice(['Elétrica', 'Mecânica', 'Pneus', 'Suspensão'])
+        })
+    if mecanicos:
+        supabase.table('mecanico').insert(mecanicos).execute()
+
 def gerar_alugueis(qtd: int = 2):
-    """Gera aluguéis sem permitir que um cliente tenha períodos sobrepostos."""
+    """Gera aluguéis sem permitir que um cliente tenha períodos sobrepostos e associa serviços."""
     clientes = supabase.table('cliente').select('id').execute().data or []
     veiculos  = supabase.table('veiculo').select('id, statusdisponibilidade, tier').execute().data
     seguros   = supabase.table('seguro').select('*').execute().data
@@ -175,19 +186,30 @@ def gerar_alugueis(qtd: int = 2):
             .eq('id', veiculo['id']).execute()
 
     if alugueis:
-        supabase.table('aluguel').insert(alugueis).execute()
+        # insere alugueis e obtém registros com IDs
+        result = supabase.table('aluguel').insert(alugueis).execute()
+        # busca lista de serviços
+        servicos = supabase.table('servico').select('id, valorpadrao').execute().data or []
+        alug_servicos = []
+        # para cada aluguel inserido, associa de 1 a 3 serviços
+        for aluguel in result.data:
+            escolhidos = random.sample(servicos, k=min(3, len(servicos)))
+            for s in escolhidos:
+                alug_servicos.append({
+                    'id_aluguel':   aluguel['id'],
+                    'id_servico':   s['id'],
+                    'preco':        round(s['valorpadrao'] * random.uniform(0.8, 1.2), 2),
+                    'quantidade':   random.randint(1, 2)
+                })
+        if alug_servicos:
+            supabase.table('aluguel_servico').insert(alug_servicos).execute()
     else:
         print("Nenhum aluguel gerado.")
 
 def gerar_manutencoes(qtd: int = 1):
     """
-    Gera registros de manutenção para veículos disponíveis e garante o histórico,
-    usando datas onde o início ocorre entre hoje – 90 e hoje.
-    Para manutenção:
-      - Se o status for 'Concluído', a data de fim deverá ser anterior a hoje.
-      - Se for 'Ativo', a data de fim ficará posterior ou igual a hoje.
-    O campo 'status' na manutenção utilizará a mesma lógica de aluguel.
-    OBS: A coluna datafim será armazenada apenas com a data (YYYY-MM-DD).
+    Gera registros de manutenção para veículos disponíveis, agora
+    armazenando idveiculo diretamente na tabela manutencao.
     """
     veiculos = supabase.table('veiculo').select('id, statusdisponibilidade').execute().data
     disponiveis = [v for v in veiculos if v['statusdisponibilidade'] == 'Disponível']
@@ -196,14 +218,10 @@ def gerar_manutencoes(qtd: int = 1):
         return
 
     manutencoes_data = []
-    relacionamentos = []
     hoje = datetime.now().date()  # utilizando date para consistência
     inicio_min = hoje - timedelta(days=90)
     fim_max = hoje + timedelta(days=60)
 
-    # Define status aleatório para manutenção
-    status_manutencao = random.choice(['Ativo', 'Concluído'])
-    
     for _ in range(qtd):
         veiculo = random.choice(disponiveis)
         # Marca o veículo como em manutenção
@@ -213,6 +231,9 @@ def gerar_manutencoes(qtd: int = 1):
             .execute()
         
         data_inicio = fake.date_between_dates(date_start=inicio_min, date_end=hoje)
+        
+        # Define status aleatório para manutenção
+        status_manutencao = random.choice(['Ativo', 'Concluído'])
         
         # Determina data_fim e status_local conforme a regra:
         # Se status 'Concluído', a data de fim deverá ser anterior a hoje
@@ -237,19 +258,15 @@ def gerar_manutencoes(qtd: int = 1):
             data_fim = min_fim + timedelta(days=duracao)
             status_local = 'Ativo'
         
-        # Constrói o registro de manutenção incluindo o campo 'status'
-        manutencao = {
-            'tipo':       random.choice(['preventiva', 'corretiva']),
-            'datainicio': data_inicio.strftime("%Y-%m-%d"),
-            'datafim':    data_fim.strftime("%Y-%m-%d"),
-            'custo':      round(random.uniform(300, 5000), 2),
-            'descricao':  fake.sentence(),
-            'status':     status_local
-        }
-        manutencoes_data.append(manutencao)
-        relacionamentos.append({
-            'idveiculo': veiculo['id'],
-            'data_inicio': data_inicio.isoformat()
+        # Constrói o registro incluindo idveiculo
+        manutencoes_data.append({
+            'idveiculo':  veiculo['id'],
+            'tipo':        random.choice(['preventiva', 'corretiva']),
+            'datainicio':  data_inicio.strftime("%Y-%m-%d"),
+            'datafim':     data_fim.strftime("%Y-%m-%d"),
+            'custo':       round(random.uniform(300, 5000), 2),
+            'descricao':   fake.sentence(),
+            'status':      status_local
         })
         disponiveis = [v for v in disponiveis if v['id'] != veiculo['id']]
     
@@ -257,26 +274,33 @@ def gerar_manutencoes(qtd: int = 1):
         print("Nenhuma manutenção gerada.")
         return
     
+    # Inserir diretamente na tabela manutencao
     result = supabase.table('manutencao').insert(manutencoes_data).execute()
     
-    for idx, m in enumerate(result.data):
-        rel = relacionamentos[idx]
-        # Garante somente data (YYYY-MM-DD) no histórico
-        data_reg = datetime.fromisoformat(m['datainicio']).date().strftime("%Y-%m-%d")
-        supabase.table('historicomanutencao').insert({
-            'idveiculo':    rel['idveiculo'],
-            'idmanutencao': m['id'],
-            'dataregistro': data_reg
-        }).execute()
-        # Libera o veículo após a manutenção
-        supabase.table('veiculo') \
-            .update({'statusdisponibilidade': 'Disponível'}) \
-            .eq('id', rel['idveiculo']) \
-            .execute()
+    # Atualiza status do veículo após inserção
+    for m in result.data:
+        novo_status = 'Disponível' if m['status'] == 'Concluído' else 'Manutenção'
+        supabase.table('veiculo').update(
+            {'statusdisponibilidade': novo_status}
+        ).eq('id', m['idveiculo']).execute()
+
+    # após inserir manutenções, associa de 1 a 2 mecânicos
+    mecanicos = supabase.table('mecanico').select('id').execute().data or []
+    mm = []
+    for m in result.data:
+        escolhidos = random.sample(mecanicos, k=min(2, len(mecanicos)))
+        for mech in escolhidos:
+            mm.append({
+                'id_manutencao':     m['id'],
+                'id_mecanico':       mech['id'],
+                'horas_trabalhadas': round(random.uniform(1, 4), 2)
+            })
+    if mm:
+        supabase.table('manutencao_mecanico').insert(mm).execute()
 
 def gerar_tudo(nivel: int):
     """
-    Gera todos os dados (clientes, veículos, manutenções e aluguéis) de acordo com o nível.
+    Gera todos os dados (clientes, veículos, mecânicos, manutenções e aluguéis) de acordo com o nível.
     Parâmetro:
       nivel: int de 1 a 5, onde 1 gera poucos dados e 5 gera muitos dados.
     """
@@ -295,10 +319,11 @@ def gerar_tudo(nivel: int):
     
     gerar_clientes(qtd_clientes)
     gerar_veiculos(qtd_veiculos)
+    gerar_mecanicos(5)            # popula tabela de mecânicos
     gerar_manutencoes(qtd_manutencoes)
     gerar_alugueis(qtd_alugueis)
 
 if __name__ == "__main__":
     # Exemplo: para gerar dados em nível 2 (pode ser ajustado conforme necessário)
-    gerar_tudo(1)
+    gerar_tudo(5)
     print("Dados inseridos com sucesso!")
