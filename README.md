@@ -197,12 +197,29 @@ Após configurar e criar as tabelas, execute o script para popular o banco de da
 python main.py
 ```
 
+## Queries SQL
+
+O projeto inclui diversas queries SQL, separadas em:
+
+- **Queries Principais:**  
+  -  Query 1: Listar todos os clientes com alugueis ativos
+  - Query 2: Listar todos os alugueis de um cliente específico
+  - Query 3: Listar a ultima manutenção de cada veículo
+  - Query 4: Listar todos os veículos disponíveis para aluguel
+  - Query 5: Listar todos os veículos em algum estado específico
+  - Query 6: Servicos mais utilizados nos alugueis
+  - Query 7: Listar os 10 clientes que mais gastaram
+  - Query 8: Mostar todas as mautenções de um status específico, com horas de trabalho e mecanicos
+  - Query 9: Mostrar quantidade de alugueis por modelo de veiculo
+  - Query 10: Mostrar quantidade de alugueis e manutenções por modelo de veiculo
+
+Consulte o arquivo `queries.sql` para visualizar o código completo de cada query.
+
 ### Execução das Queries
 
-As queries SQL estão presentes no arquivo `querrys.sql`. Utilize o editor SQL do Supabase para copiá-las e executá-las conforme necessário.
+As queries SQL estão presentes no arquivo `queries.sql`. Utilize o editor SQL do Supabase para copiá-las e executá-las conforme necessário.
 
-6. **Validação dos Dados:**  
-   Utilize os resultados das queries para verificar a consistência e integridade dos dados inseridos.
+
 
 ## Equipe
 
