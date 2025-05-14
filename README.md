@@ -119,4 +119,4 @@ erDiagram
 
 ### modelo-relacional-3FN
 
-![Diagrama MER](Diagrama/3FN.svg)
+![Diagrama MER](Diagrama/3FN.png)
