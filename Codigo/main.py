@@ -201,11 +201,12 @@ def gerar_alugueis(qtd: int = 2):
         for aluguel in result.data:
             escolhidos = random.sample(servicos, k=min(3, len(servicos)))
             for s in escolhidos:
+                quantidade = random.randint(1, 2)
                 alug_servicos.append({
-                    'id_aluguel':   aluguel['id'],
-                    'id_servico':   s['id'],
-                    'preco':        round(s['valorpadrao'] * random.uniform(0.8, 1.2), 2),
-                    'quantidade':   random.randint(1, 2)
+                    'id_aluguel': aluguel['id'],
+                    'id_servico': s['id'],
+                    'quantidade': quantidade,
+                    'preco': round(s['valorpadrao'] * quantidade, 2)
                 })
         if alug_servicos:
             supabase.table('aluguel_servico').insert(alug_servicos).execute()
