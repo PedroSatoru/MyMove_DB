@@ -105,14 +105,20 @@ def gerar_alugueis(qtd: int = 2):
     seguros   = supabase.table('seguro').select('*').execute().data
 
     # Carrega todos os alugueis existentes (ativos ou concluídos)
-    resp = supabase.table('aluguel').select('idcliente, datainicio, datafim').execute().data or []
+    resp = supabase.table('aluguel').select('idcliente, idveiculo, datainicio, datafim').execute().data or []
+
     # Mapa: cliente_id -> list of (start_date, end_date)
     alug_map: dict[int, list[tuple[datetime.date, datetime.date]]] = {}
+    # Mapa: veiculo_id -> list of (start_date, end_date)
+    veh_map: dict[int, list[tuple[datetime.date, datetime.date]]] = {}
+
     for a in resp:
         cid = a['idcliente']
+        vid = a['idveiculo']
         s = datetime.fromisoformat(a['datainicio']).date()
         e = datetime.fromisoformat(a['datafim']).date()
         alug_map.setdefault(cid, []).append((s, e))
+        veh_map.setdefault(vid, []).append((s, e))
 
     alugueis = []
     hoje      = datetime.now().date()
@@ -120,18 +126,8 @@ def gerar_alugueis(qtd: int = 2):
     fim_max    = hoje + timedelta(days=60)
 
     for _ in range(qtd):
-        # escolhe veículo disponível
-        veiculos = supabase.table('veiculo') \
-            .select('id, statusdisponibilidade, tier') \
-            .execute().data
-        disponiveis = [v for v in veiculos if v['statusdisponibilidade']=='Disponível']
-        if not disponiveis:
-            print("Nenhum veículo disponível.")
-            break
-
-        # gera período do aluguel
+        # Gera primeiro o período do aluguel
         data_inicio = fake.date_between_dates(date_start=inicio_min, date_end=hoje)
-        # decide status
         status_aluguel = random.choice(['Ativo', 'Concluído'])
         if status_aluguel == 'Concluído':
             fim_lim = hoje - timedelta(days=1)
@@ -140,50 +136,59 @@ def gerar_alugueis(qtd: int = 2):
                 status_aluguel = 'Ativo'
             else:
                 dias = (fim_lim - min_fim).days
-                dur  = random.randint(1, dias if dias>0 else 1)
+                dur  = random.randint(1, dias if dias > 0 else 1)
                 data_fim = min_fim + timedelta(days=dur)
         if status_aluguel == 'Ativo':
             min_fim = max(hoje, data_inicio + timedelta(days=1))
             dias = (fim_max - min_fim).days
-            dur  = random.randint(1, dias if dias>0 else 1)
+            dur  = random.randint(1, dias if dias > 0 else 1)
             data_fim = min_fim + timedelta(days=dur)
 
-        # filtra clientes sem sobreposições nesse período
+        # Agora, filtre veículos disponíveis sem conflitos
+        veiculos = supabase.table('veiculo').select('id, statusdisponibilidade, tier').execute().data
+        disponiveis = [v for v in veiculos if v['statusdisponibilidade'] == 'Disponível']
+        disponiveis_validos = [v for v in disponiveis if 
+            all(not (data_inicio <= r_end and r_start <= data_fim) for (r_start, r_end) in veh_map.get(v['id'], []))
+        ]
+        
+        if not disponiveis_validos:
+            print("Nenhum veículo livre nesse período.")
+            continue
+
+        # Filtra os clientes que não possuem conflito no período
         dispon_clientes = []
         for c in clientes:
             periodos = alug_map.get(c['id'], [])
-            if all(not (s <= data_fim and data_inicio <= e) for (s, e) in periodos):
+            if all(not (data_inicio <= e and s <= data_fim) for (s, e) in periodos):
                 dispon_clientes.append(c)
         if not dispon_clientes:
-            print("Nenhum cliente livre para novo aluguel nesse período.")
+            print("Nenhum cliente livre para novo aluguel neste período.")
             break
 
-        veiculo = random.choice(disponiveis)
+        veiculo = random.choice(disponiveis_validos)
         cliente = random.choice(dispon_clientes)
         seguro  = random.choice(seguros)
 
-        # calcula valor
-        valor_dia     = 80 if veiculo['tier']=='Básico' else 140
-        seguro_valor  = seguro.get('valorbasico' if veiculo['tier']=='Básico' else 'valoravancado', 0)
-        valortotal    = valor_dia * (data_fim - data_inicio).days + seguro_valor
+        valor_dia    = 80 if veiculo['tier'] == 'Básico' else 140
+        seguro_valor = seguro.get('valorbasico' if veiculo['tier'] == 'Básico' else 'valoravancado', 0)
+        valortotal   = valor_dia * (data_fim - data_inicio).days + seguro_valor
 
         alugueis.append({
-            'idcliente':   cliente['id'],
-            'idveiculo':   veiculo['id'],
-            'idseguro':    seguro['id'],
-            'datainicio':  data_inicio.strftime("%Y-%m-%d"),
-            'datafim':     data_fim.strftime("%Y-%m-%d"),
-            'valortotal':  valortotal,
-            'status':      status_aluguel
+            'idcliente':  cliente['id'],
+            'idveiculo':  veiculo['id'],
+            'idseguro':   seguro['id'],
+            'datainicio': data_inicio.strftime("%Y-%m-%d"),
+            'datafim':    data_fim.strftime("%Y-%m-%d"),
+            'valortotal': valortotal,
+            'status':     status_aluguel
         })
 
-        # atualiza mapa para evitar nova sobreposição
         alug_map.setdefault(cliente['id'], []).append((data_inicio, data_fim))
+        veh_map.setdefault(veiculo['id'], []).append((data_inicio, data_fim))
 
-        # atualiza status do veículo
-        new_status = 'Alugado' if status_aluguel=='Ativo' else 'Disponível'
-        supabase.table('veiculo') \
-            .update({'statusdisponibilidade': new_status}) \
+        # Atualiza status do veículo
+        new_status = 'Alugado' if status_aluguel == 'Ativo' else 'Disponível'
+        supabase.table('veiculo').update({'statusdisponibilidade': new_status}) \
             .eq('id', veiculo['id']).execute()
 
     if alugueis:
