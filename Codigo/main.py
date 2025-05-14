@@ -87,12 +87,13 @@ def gerar_veiculos(qtd: int = 2):
         print("Nenhum veículo gerado.")
 
 def gerar_mecanicos(qtd: int = 5):
-    """Gera mecânicos para atribuir às manutenções."""
+    """Gera mecânicos para atribuir às manutenções com especialidade definida (preventiva ou corretiva)."""
     mecanicos = []
     for _ in range(qtd):
         mecanicos.append({
             'nome': fake.name(),
-            'especialidade': random.choice(['Elétrica', 'Mecânica', 'Pneus', 'Suspensão'])
+            # A especialidade agora é definida como 'preventiva' ou 'corretiva'
+            'especialidade': random.choice(['preventiva', 'corretiva'])
         })
     if mecanicos:
         supabase.table('mecanico').insert(mecanicos).execute()
@@ -208,8 +209,8 @@ def gerar_alugueis(qtd: int = 2):
 
 def gerar_manutencoes(qtd: int = 1):
     """
-    Gera registros de manutenção para veículos disponíveis, agora
-    armazenando idveiculo diretamente na tabela manutencao.
+    Gera registros de manutenção para veículos disponíveis, armazenando idveiculo na tabela manutenção.
+    Apenas mecânicos com especialidade compatível com o tipo de manutenção serão associados.
     """
     veiculos = supabase.table('veiculo').select('id, statusdisponibilidade').execute().data
     disponiveis = [v for v in veiculos if v['statusdisponibilidade'] == 'Disponível']
@@ -232,11 +233,8 @@ def gerar_manutencoes(qtd: int = 1):
         
         data_inicio = fake.date_between_dates(date_start=inicio_min, date_end=hoje)
         
-        # Define status aleatório para manutenção
+        # Define status aleatório para manutenção e determina data_fim
         status_manutencao = random.choice(['Ativo', 'Concluído'])
-        
-        # Determina data_fim e status_local conforme a regra:
-        # Se status 'Concluído', a data de fim deverá ser anterior a hoje
         if status_manutencao == 'Concluído':
             if data_inicio >= hoje:
                 status_local = 'Ativo'
@@ -250,7 +248,6 @@ def gerar_manutencoes(qtd: int = 1):
                     duracao = random.randint(1, dias_range if dias_range > 0 else 1)
                     data_fim = min_fim + timedelta(days=duracao)
                     status_local = 'Concluído'
-        # Se status 'Ativo', a data de fim deverá ser posterior ou igual a hoje
         if status_manutencao == 'Ativo' or ('status_local' in locals() and status_local == 'Ativo'):
             min_fim = max(hoje, data_inicio + timedelta(days=1))
             dias_range = (fim_max - min_fim).days
@@ -258,15 +255,17 @@ def gerar_manutencoes(qtd: int = 1):
             data_fim = min_fim + timedelta(days=duracao)
             status_local = 'Ativo'
         
-        # Constrói o registro incluindo idveiculo
+        # Define o tipo de manutenção (preventiva ou corretiva)
+        manut_tipo = random.choice(['preventiva', 'corretiva'])
+        
         manutencoes_data.append({
             'idveiculo':  veiculo['id'],
-            'tipo':        random.choice(['preventiva', 'corretiva']),
-            'datainicio':  data_inicio.strftime("%Y-%m-%d"),
-            'datafim':     data_fim.strftime("%Y-%m-%d"),
-            'custo':       round(random.uniform(300, 5000), 2),
-            'descricao':   fake.sentence(),
-            'status':      status_local
+            'tipo':       manut_tipo,
+            'datainicio': data_inicio.strftime("%Y-%m-%d"),
+            'datafim':    data_fim.strftime("%Y-%m-%d"),
+            'custo':      round(random.uniform(300, 5000), 2),
+            'descricao':  fake.sentence(),
+            'status':     status_local
         })
         disponiveis = [v for v in disponiveis if v['id'] != veiculo['id']]
     
@@ -274,7 +273,7 @@ def gerar_manutencoes(qtd: int = 1):
         print("Nenhuma manutenção gerada.")
         return
     
-    # Inserir diretamente na tabela manutencao
+    # Inserir manutenções e obter registros com IDs
     result = supabase.table('manutencao').insert(manutencoes_data).execute()
     
     # Atualiza status do veículo após inserção
@@ -283,18 +282,21 @@ def gerar_manutencoes(qtd: int = 1):
         supabase.table('veiculo').update(
             {'statusdisponibilidade': novo_status}
         ).eq('id', m['idveiculo']).execute()
-
-    # após inserir manutenções, associa de 1 a 2 mecânicos
-    mecanicos = supabase.table('mecanico').select('id').execute().data or []
+    
+    # Após inserir manutenções, associa mecânicos compatíveis com a especialidade da manutenção
+    mecanicos = supabase.table('mecanico').select('id, especialidade').execute().data or []
     mm = []
     for m in result.data:
-        escolhidos = random.sample(mecanicos, k=min(2, len(mecanicos)))
-        for mech in escolhidos:
-            mm.append({
-                'id_manutencao':     m['id'],
-                'id_mecanico':       mech['id'],
-                'horas_trabalhadas': round(random.uniform(1, 4), 2)
-            })
+        # Filtra os mecânicos cuja especialidade é compatível com o tipo da manutenção
+        mec_validos = [mech for mech in mecanicos if mech['especialidade'].lower() == m['tipo'].lower()]
+        if mec_validos:
+            escolhidos = random.sample(mec_validos, k=min(2, len(mec_validos)))
+            for mech in escolhidos:
+                mm.append({
+                    'id_manutencao':     m['id'],
+                    'id_mecanico':       mech['id'],
+                    'horas_trabalhadas': round(random.uniform(1, 4), 2)
+                })
     if mm:
         supabase.table('manutencao_mecanico').insert(mm).execute()
 
