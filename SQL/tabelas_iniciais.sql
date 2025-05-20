@@ -52,7 +52,7 @@ CREATE TABLE public.aluguel (
   idseguro  integer NOT NULL,
   datainicio date NOT NULL,
   datafim    date NOT NULL,
-  valortotal numeric(10,2) NOT NULL,
+  valor numeric(10,2) NOT NULL,
   status     text DEFAULT 'Ativo',
   -- chaves estrangeiras
   CONSTRAINT fk_aluguel_cliente FOREIGN KEY (idcliente)
@@ -94,6 +94,7 @@ CREATE TABLE public.aluguel_servico (
   id_aluguel bigint NOT NULL,
   id_servico bigint NOT NULL,
   preco      numeric(10,2) NOT NULL,
+  quantidade integer NOT NULL,
   CONSTRAINT pk_aluguel_servico PRIMARY KEY (id_aluguel, id_servico),
   CONSTRAINT fk_as_aluguel FOREIGN KEY (id_aluguel)
     REFERENCES public.aluguel(id),

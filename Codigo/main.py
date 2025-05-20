@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 import random
 from faker import Faker
-from faker_vehicle import VehicleProvider
 from datetime import datetime, timedelta
 
 # Carregar variáveis de ambiente
@@ -23,7 +22,6 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Gerar nomes e frases em português
 fake = Faker('pt_BR')
-fake.add_provider(VehicleProvider)
 fake.seed_instance(10)
 
 def gerar_clientes(qtd: int = 3):
@@ -179,7 +177,7 @@ def gerar_alugueis(qtd: int = 2):
             'idseguro':   seguro['id'],
             'datainicio': data_inicio.strftime("%Y-%m-%d"),
             'datafim':    data_fim.strftime("%Y-%m-%d"),
-            'valortotal': valortotal,
+            'valor': valortotal,
             'status':     status_aluguel
         })
 
@@ -216,30 +214,36 @@ def gerar_alugueis(qtd: int = 2):
 def gerar_manutencoes(qtd: int = 1):
     """
     Gera registros de manutenção para veículos disponíveis, armazenando idveiculo na tabela manutenção.
+    Verifica se o veículo já possui manutenção em período sobreposto e, caso positivo, o ignora.
     Apenas mecânicos com especialidade compatível com o tipo de manutenção serão associados.
     """
+    # Busca os veículos disponíveis
     veiculos = supabase.table('veiculo').select('id, statusdisponibilidade').execute().data
     disponiveis = [v for v in veiculos if v['statusdisponibilidade'] == 'Disponível']
     if not disponiveis:
         print("Nenhum veículo disponível para manutenção.")
         return
 
+    # Carrega manutenções já existentes para evitar sobreposição
+    resp_manut = supabase.table('manutencao').select('idveiculo, datainicio, datafim').execute().data or []
+    # Mapa: veiculo_id -> list of (start_date, end_date)
+    manut_map: dict[int, list[tuple[datetime.date, datetime.date]]] = {}
+    for m in resp_manut:
+        vid = m['idveiculo']
+        s = datetime.fromisoformat(m['datainicio']).date()
+        # Se datafim estiver nula, assume o mesmo dia
+        e = datetime.fromisoformat(m['datafim']).date() if m.get('datafim') else s
+        manut_map.setdefault(vid, []).append((s, e))
+
     manutencoes_data = []
-    hoje = datetime.now().date()  # utilizando date para consistência
+    hoje = datetime.now().date()  # data atual
     inicio_min = hoje - timedelta(days=90)
     fim_max = hoje + timedelta(days=60)
 
     for _ in range(qtd):
         veiculo = random.choice(disponiveis)
-        # Marca o veículo como em manutenção
-        supabase.table('veiculo') \
-            .update({'statusdisponibilidade': 'Manutenção'}) \
-            .eq('id', veiculo['id']) \
-            .execute()
-        
+        # Gere o período da manutenção
         data_inicio = fake.date_between_dates(date_start=inicio_min, date_end=hoje)
-        
-        # Define status aleatório para manutenção e determina data_fim
         status_manutencao = random.choice(['Ativo', 'Concluído'])
         if status_manutencao == 'Concluído':
             if data_inicio >= hoje:
@@ -260,11 +264,18 @@ def gerar_manutencoes(qtd: int = 1):
             duracao = random.randint(1, dias_range if dias_range > 0 else 1)
             data_fim = min_fim + timedelta(days=duracao)
             status_local = 'Ativo'
-        
+
+        # Verifica se o veículo já possui manutenção neste período
+        periodos_existentes = manut_map.get(veiculo['id'], [])
+        conflito = any(data_inicio <= r_end and r_start <= data_fim for (r_start, r_end) in periodos_existentes)
+        if conflito:
+            print(f"Veículo {veiculo['id']} já possui manutenção em período sobreposto. Pulando este veículo.")
+            continue
+
         # Define o tipo de manutenção (preventiva ou corretiva)
         manut_tipo = random.choice(['preventiva', 'corretiva'])
         
-        manutencoes_data.append({
+        registro = {
             'idveiculo':  veiculo['id'],
             'tipo':       manut_tipo,
             'datainicio': data_inicio.strftime("%Y-%m-%d"),
@@ -272,13 +283,17 @@ def gerar_manutencoes(qtd: int = 1):
             'custo':      round(random.uniform(300, 5000), 2),
             'descricao':  fake.sentence(),
             'status':     status_local
-        })
+        }
+        manutencoes_data.append(registro)
+        # Atualiza o mapa da manutenção para evitar sobreposição em futuras inserções
+        manut_map.setdefault(veiculo['id'], []).append((data_inicio, data_fim))
+        # Remove o veículo da lista de disponíveis para não ser escolhido novamente neste ciclo
         disponiveis = [v for v in disponiveis if v['id'] != veiculo['id']]
-    
+
     if not manutencoes_data:
         print("Nenhuma manutenção gerada.")
         return
-    
+
     # Inserir manutenções e obter registros com IDs
     result = supabase.table('manutencao').insert(manutencoes_data).execute()
     
@@ -289,11 +304,10 @@ def gerar_manutencoes(qtd: int = 1):
             {'statusdisponibilidade': novo_status}
         ).eq('id', m['idveiculo']).execute()
     
-    # Após inserir manutenções, associa mecânicos compatíveis com a especialidade da manutenção
+    # Associa mecânicos compatíveis com o tipo da manutenção
     mecanicos = supabase.table('mecanico').select('id, especialidade').execute().data or []
     mm = []
     for m in result.data:
-        # Filtra os mecânicos cuja especialidade é compatível com o tipo da manutenção
         mec_validos = [mech for mech in mecanicos if mech['especialidade'].lower() == m['tipo'].lower()]
         if mec_validos:
             escolhidos = random.sample(mec_validos, k=min(2, len(mec_validos)))
