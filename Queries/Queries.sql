@@ -96,7 +96,7 @@ ORDER BY total_uso DESC;
 -- Query 7: Listar os 10 clientes que mais gastaram
 SELECT 
   c.nome,
-  SUM(a.valortotal + COALESCE(asv_total.total_servicos, 0)) AS total_gasto
+  SUM(a.valor + COALESCE(asv_total.total_servicos, 0)) AS total_gasto
 FROM cliente c
 JOIN aluguel a ON c.id = a.idcliente
 LEFT JOIN (
