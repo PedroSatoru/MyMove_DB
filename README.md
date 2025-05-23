@@ -80,7 +80,7 @@ erDiagram
       bigint idseguro FK
       date datainicio
       date datafim
-      numeric valortotal
+      numeric valor
       text status
     }
     SERVICO {
