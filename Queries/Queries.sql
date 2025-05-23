@@ -28,12 +28,12 @@ WHERE a.status = 'Ativo';
 -- Query 2: Listar todos os alugueis de um cliente específico
 SELECT 
     a.id AS id_aluguel,
-    a.datainicio,
-    a.datafim,
-    a.valortotal,
-    a.status,
     c.nome AS nome_cliente,
     v.modelo AS modelo_veiculo,
+    a.datainicio,
+    a.datafim,
+    a.valor,
+    a.status,
     v.tier AS tier_veiculo,
     s.tipo AS nivel_seguro
 FROM 
@@ -61,11 +61,11 @@ ORDER BY ultima_manutencao DESC;
 -- Query 4: Listar em ordem decrescente o lucro total de cada veículo
 SELECT 
   v.modelo,
-  COALESCE(SUM(a.valor), 0) AS custo_total
+  COALESCE(SUM(a.valor), 0) AS valor_gerado
 FROM veiculo v
 LEFT JOIN aluguel a ON v.id = a.idveiculo
 GROUP BY v.modelo
-ORDER BY custo_total DESC;
+ORDER BY valor_gerado DESC;
 
 -- Query 5: Listar todos os veículos em algum estado específico
 -- Modificar o status desejado na cláusula WHERE
@@ -121,7 +121,7 @@ JOIN manutencao_mecanico mm ON m.id = mm.id_manutencao
 JOIN mecanico mec ON mm.id_mecanico = mec.id
 WHERE m.status = 'Concluído'  -- Modificar para estatus desejado, seja 'Ativo' ou 'Concluído'
 GROUP BY m.id, m.idveiculo
-ORDER BY m.custo DESC;
+ORDER BY total_horas_trabalhadas DESC;
 
 -- Query 9: Mostrar a media de duração dos alugueis por tier de veiculo e quantidade de alugueis
 -- Esta consulta retorna a média de duração dos alugueis por tier de veiculo e a quantidade total de alugueis por tier
