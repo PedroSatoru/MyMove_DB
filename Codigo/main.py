@@ -54,6 +54,10 @@ def gerar_clientes(qtd: int = 3):
     else:
         print("Nenhum novo cliente para inserir.")
 
+
+"""Lista de marcas e modelos de veículos.
+   A lista de modelos tem a quantidade de modelos por marca ajustada para 4,
+   com os dois primeiros modelos sendo 'Básico' e os dois últimos 'Avançado'."""
 MAKE_MODEL = {
     'Toyota': ['Yaris', 'Etios', 'RAV4', 'Corrola'],
     'Honda':  ['Fit', 'City', 'CR-V', 'Civic'],

@@ -20,11 +20,15 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 # Criar cliente Supabase
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-
+"""
+# ---------------------
+# Funções de Verificação
+# ---------------------"""
 def carregarTabelas(table):
     print(f"🔄 Carregando dados da tabela {table}...")
     data = supabase.table(table).select("*").execute().data
     return pd.DataFrame(data)
+
 
 def checarNulos(df, colunas, nome=""):
     print(f"\n Verificando nulos na tabela {nome}...")
@@ -73,6 +77,8 @@ def checarStatusAluguel(df_aluguel):
     else:
         print("⚠️ Não foi possível verificar status do aluguel - colunas necessárias não encontradas")
 
+
+# Verifica se o status da manutenção está correto
 def checarStatusManutencao(df_manutencao):
     if all(col in df_manutencao.columns for col in ['status', 'datainicio', 'datafim']):
         print(f"\n Verificando status da manutenção com datas...")
@@ -90,6 +96,8 @@ def checarStatusManutencao(df_manutencao):
     else:
         print("⚠️ Não foi possível verificar status da manutenção - colunas necessárias não encontradas")
 
+# Verifica se os mecânicos estão vinculados corretamente às manutenções
+# e se a especialidade do mecânico corresponde ao tipo de manutenção
 def checarMecanicos(df_mm, df_mec, df_man):
     if all(col in df_mm.columns for col in ['id_mecanico', 'id_manutencao']) and \
        'id' in df_mec.columns and \
@@ -104,6 +112,8 @@ def checarMecanicos(df_mm, df_mec, df_man):
     else:
         print("⚠️ Não foi possível verificar mecânicos - colunas necessárias não encontradas")
 
+# Verifica se as placas dos veículos estão no formato correto e se são únicas
+# Formato esperado: ABC1D23 ou ABC1234
 def checarPlacas(df):
     if 'placa' in df.columns:
         print(f"\n Verificando placas únicas e formato...")
@@ -119,6 +129,9 @@ def checarPlacas(df):
     else:
         print("⚠️ Não foi possível verificar placas - coluna 'placa' não encontrada")
 
+
+# Verifica se as CNHs dos clientes estão no formato correto e se são únicas
+# Formato esperado: 12345678900
 def checarCNH(df):
     if 'cnh' in df.columns:
         print(f"\n Verificando CNH únicas...")
@@ -126,6 +139,8 @@ def checarCNH(df):
     else:
         print("⚠️ Não foi possível verificar CNH - coluna 'cnh' não encontrada")
 
+# Verifica se os emails dos clientes estão no formato correto e se são únicos
+# Formato esperado: joao@gmail.com
 def checarEmail(df):
     if 'email' in df.columns:
         print(f"\n Verificando Email únicos e formato...")
@@ -141,10 +156,10 @@ def checarEmail(df):
         print("⚠️ Não foi possível verificar emails - coluna 'email' não encontrada")
 
 
+# Verifica se o valor total dos aluguéis está consistente com o cálculo esperado
 def checarSeguroVeiculo(df_aluguel, df_veiculo, df_seguro):
     """
-    Verifica se o valor total dos aluguéis está consistente com o cálculo esperado,
-    ou seja: (valor do carro por dia * número de dias) + valor fixo do seguro.
+    (valor do carro por dia * número de dias) + valor fixo do seguro.
     
     Para veículos 'Básico', usa diária = 80 e seguro = valorbasico;
     Para veículos 'Avançado', usa diária = 140 e seguro = valoravancado.
@@ -192,9 +207,10 @@ def checarSeguroVeiculo(df_aluguel, df_veiculo, df_seguro):
     else:
         print("⚠️ Não foi possível verificar valores de aluguel - colunas necessárias não encontradas")
 
+
+# Verifica se o status dos veículos está consistente de acordo com as atividades
 def checarStatusVeiculo(df_veiculo, df_aluguel, df_manutencao):
     """
-    Verifica se o status dos veículos está consistente de acordo com as atividades:
       - Veículos com aluguel ativo (ou seja, onde datafim > hoje) devem ter status 'Alugado'
       - Veículos em manutenção ativa (ou seja, onde datafim > hoje) devem ter status 'Em Manutenção'
       - Veículos sem atividades ativas devem ter status 'Disponível'
