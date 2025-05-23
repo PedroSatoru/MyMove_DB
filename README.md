@@ -240,7 +240,7 @@ O projeto inclui diversas queries SQL, separadas em:
   -  Query 1: Listar todos os clientes com alugueis ativos
   - Query 2: Listar todos os alugueis de um cliente específico
   - Query 3: Listar a ultima manutenção de cada veículo
-  - Query 4: Listar em ordem decrescente o lucro total de cada veículo
+  - Query 4: Listar em ordem decrescente o lucro total de cada modelo de veículo
   - Query 5: Listar todos os veículos em algum estado específico
   - Query 6: Servicos mais utilizados nos alugueis
   - Query 7: Listar os 10 clientes que mais gastaram
