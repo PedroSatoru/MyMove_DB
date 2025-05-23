@@ -126,10 +126,10 @@ erDiagram
 - **main.py**  
   Código Python responsável por gerar dados fictícios e popular o banco de dados utilizando a API do Supabase.
 
- - **verificador.py**  
+ - **testeConsistencia.py**  
   Código Python responsável por verificar os dados fictícios do banco de dados utilizando a API do Supabase.
 
-- **querrys.sql**  
+- **Queries.sql**  
   Contém as queries SQL utilizadas para validar e extrair informações do banco, incluindo as queries principais e as extras.
 
 - **tabelas_iniciais.sql**  
@@ -196,6 +196,40 @@ Após configurar e criar as tabelas, execute o script para popular o banco de da
 ```
 python main.py
 ```
+
+## Teste de Consistência
+
+O arquivo `testeConsistencia.py` foi desenvolvido para validar a integridade dos dados inseridos no banco, realizando diversas verificações para assegurar que todas as regras de negócio estejam sendo cumpridas. As principais validações incluem:
+
+- **Verificação de Nulos e Duplicatas:**  
+  Garante que as informações críticas, como emails, placas e CNHs, não contenham valores nulos ou registros duplicados.
+
+- **Validação de Formatos:**  
+  Confirma que os emails, placas e CNHs estejam no formato esperado. Por exemplo, os emails devem seguir o padrão `joao@gmail.com` e as placas devem estar no formato correto (exemplo: `ABC-1D23` ou `ABC1234`).
+
+- **Conferência de Valores dos Aluguéis:**  
+  Verifica se o valor total dos aluguéis está consistente com o cálculo esperado, que é composto por:
+  - O valor da locação: calculado como (diária * número de dias), onde a diária é determinada pelo tier do veículo (80 para "Básico" e 140 para "Avançado");
+  - O valor do seguro: cobrado apenas uma vez por aluguel e definido conforme o nível do seguro e o tier do veículo (por exemplo, para veículos Básicos, 80 para seguro "Básico" e 200 para seguro "Completo"; para veículos Avançados, 150 para seguro "Básico" e 350 para seguro "Completo").
+
+- **Verificação do Status dos Veículos:**  
+  Assegura que o status dos veículos esteja de acordo com as atividades em curso. Por exemplo, veículos com aluguel ou manutenção ativos (ou seja, com `datafim` maior que a data atual) devem estar marcados como "Alugado" ou "Em Manutenção", respectivamente; caso contrário, eles devem estar indicados como "Disponível".
+
+- **Integridade dos Vínculos:**  
+  Verifica se os mecânicos vinculados às manutenções possuem a especialidade correta de acordo com o tipo da manutenção executada.
+
+Este conjunto de verificações permite identificar inconsistências e corrigir possíveis erros antes que os dados avancem para etapas críticas do sistema ou análises mais profundas.
+
+### Requisitos para execução
+
+- Python 3.8 ou superior.
+- Dependências: `supabase`, `pandas`, `python-dotenv`
+
+Instale as dependências necessárias executando:
+
+````bash
+pip install supabase pandas python-dotenv
+````
 
 ## Queries SQL
 
