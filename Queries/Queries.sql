@@ -4,7 +4,7 @@
 -- Query 1: Listar todos os clientes com alugueis ativos
 -- Query 2: Listar todos os alugueis de um cliente específico
 -- Query 3: Listar a ultima manutenção de cada veículo
--- Query 4: Listar em ordem decrescente o lucro total de cada veículo
+-- Query 4: Listar em ordem decrescente o lucro total de cada modelo de veículo
 -- Query 5: Listar todos os veículos em algum estado específico
 -- Query 6: Servicos mais utilizados nos alugueis
 -- Query 7: Listar os 10 clientes que mais gastaram
@@ -58,7 +58,7 @@ JOIN manutencao m ON v.id = m.idveiculo
 GROUP BY v.placa, v.modelo, v.id
 ORDER BY ultima_manutencao DESC;
 
--- Query 4: Listar em ordem decrescente o lucro total de cada veículo
+-- Query 4: Listar em ordem decrescente o lucro total de cada modelo de veículo
 SELECT 
   v.modelo,
   COALESCE(SUM(a.valor), 0) AS valor_gerado
