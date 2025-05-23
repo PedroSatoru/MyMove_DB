@@ -206,7 +206,7 @@ O arquivo `testeConsistencia.py` foi desenvolvido para validar a integridade dos
   Garante que as informações críticas, como emails, placas e CNHs, não contenham valores nulos ou registros duplicados.
 
 - **Validação de Formatos:**  
-  Confirma que os emails, placas e CNHs estejam no formato esperado. Por exemplo, os emails devem seguir o padrão `joao@gmail.com` e as placas devem estar no formato correto (exemplo: `ABC-1D23` ou `ABC1234`).
+  Confirma que os emails, placas e CNHs estejam no formato esperado. Por exemplo, os emails devem seguir o padrão `joao@gmail.com` e as placas devem estar no formato correto (exemplo: `ABC-1D23`).
 
 - **Conferência de Valores dos Aluguéis:**  
   Verifica se o valor total dos aluguéis está consistente com o cálculo esperado, que é composto por:
