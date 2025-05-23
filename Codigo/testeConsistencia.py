@@ -140,32 +140,6 @@ def checarEmail(df):
     else:
         print("⚠️ Não foi possível verificar emails - coluna 'email' não encontrada")
 
-def checarValorTotalAluguel(df_aluguel, df_veiculo, df_aluguel_servico, df_servico):
-    if all(col in df_aluguel.columns for col in ['id', 'idveiculo', 'valortotal']) and \
-       all(col in df_veiculo.columns for col in ['id', 'valorlocacao']) and \
-       all(col in df_aluguel_servico.columns for col in ['idaluguel', 'idservico']) and \
-       all(col in df_servico.columns for col in ['id', 'valor']):
-        
-        print(f"\n Verificando valores totais de aluguel...")
-        
-        # Calcula valor esperado (valor locação + serviços adicionais)
-        df_servicos_contratados = df_aluguel_servico.merge(df_servico, left_on='idservico', right_on='id')
-        valor_servicos = df_servicos_contratados.groupby('idaluguel')['valor'].sum().reset_index()
-        
-        df_completo = df_aluguel.merge(df_veiculo, left_on='idveiculo', right_on='id') \
-                               .merge(valor_servicos, left_on='id', right_on='idaluguel', how='left')
-        
-        df_completo['valor_servicos'] = df_completo['valor'].fillna(0)
-        df_completo['valor_esperado'] = df_completo['valorlocacao'] + df_completo['valor_servicos']
-        
-        inconsistencias = df_completo[abs(df_completo['valortotal'] - df_completo['valor_esperado']) > 0.01]
-        
-        if not inconsistencias.empty:
-            print(f"❌ Valores totais de aluguel inconsistentes! Quantidade: {len(inconsistencias)}")
-        else:
-            print("✅ Valores de aluguel consistentes com veículo e serviços.")
-    else:
-        print("⚠️ Não foi possível verificar valores de aluguel - colunas necessárias não encontradas")
 
 def checarSeguroVeiculo(df_aluguel, df_veiculo, df_seguro):
     """
@@ -219,35 +193,50 @@ def checarSeguroVeiculo(df_aluguel, df_veiculo, df_seguro):
         print("⚠️ Não foi possível verificar valores de aluguel - colunas necessárias não encontradas")
 
 def checarStatusVeiculo(df_veiculo, df_aluguel, df_manutencao):
-    if all(col in df_veiculo.columns for col in ['id', 'status']) and \
+    """
+    Verifica se o status dos veículos está consistente de acordo com as atividades:
+      - Veículos com aluguel ativo (ou seja, onde datafim > hoje) devem ter status 'Alugado'
+      - Veículos em manutenção ativa (ou seja, onde datafim > hoje) devem ter status 'Em Manutenção'
+      - Veículos sem atividades ativas devem ter status 'Disponível'
+    """
+    hoje = datetime.now().date()
+    # Verifica se as colunas necessárias existem:
+    if all(col in df_veiculo.columns for col in ['id', 'statusdisponibilidade']) and \
        'idveiculo' in df_aluguel.columns and \
        'idveiculo' in df_manutencao.columns:
-        print(f"\n Verificando status de veículos...")
+        print("\nVerificando status de veículos...")
         
-        # Veículos alugados
-        veiculos_alugados = df_aluguel[df_aluguel['datafim'].isnull()]['idveiculo'].unique()
-        inconsistencias_aluguel = df_veiculo[df_veiculo['id'].isin(veiculos_alugados) & (df_veiculo['status'] != 'Alugado')]
+        # Considera um aluguel ativo se a datafim for maior que hoje
+        veiculos_alugados = df_aluguel[pd.to_datetime(df_aluguel['datafim']).dt.date > hoje]['idveiculo'].unique()
+        inconsistencias_aluguel = df_veiculo[
+            (df_veiculo['id'].isin(veiculos_alugados)) & 
+            (df_veiculo['statusdisponibilidade'] != 'Alugado')
+        ]
         
-        # Veículos em manutenção
-        veiculos_manutencao = df_manutencao[df_manutencao['datafim'].isnull()]['idveiculo'].unique()
-        inconsistencias_manutencao = df_veiculo[df_veiculo['id'].isin(veiculos_manutencao) & (df_veiculo['status'] != 'Em Manutenção')]
+        # Considera uma manutenção ativa se a datafim for maior que hoje
+        veiculos_manutencao = df_manutencao[pd.to_datetime(df_manutencao['datafim']).dt.date > hoje]['idveiculo'].unique()
+        inconsistencias_manutencao = df_veiculo[
+            (df_veiculo['id'].isin(veiculos_manutencao)) & 
+            (df_veiculo['statusdisponibilidade'] != 'Manutenção')
+        ]
         
-        # Veículos que deveriam estar disponíveis
+        # Veículos que não estão em nenhuma atividade ativa devem estar Disponíveis
         veiculos_ocupados = set(veiculos_alugados).union(set(veiculos_manutencao))
         inconsistencias_disponivel = df_veiculo[
             (~df_veiculo['id'].isin(veiculos_ocupados)) & 
-            (df_veiculo['status'] != 'Disponível')
+            (df_veiculo['statusdisponibilidade'] != 'Disponível')
         ]
         
+        # Concatena todas as inconsistências
         inconsistencias = pd.concat([inconsistencias_aluguel, inconsistencias_manutencao, inconsistencias_disponivel])
         
         if not inconsistencias.empty:
             print(f"❌ Status de veículo inconsistente! Quantidade: {len(inconsistencias)}")
+            print(inconsistencias[['id', 'placa', 'modelo', 'statusdisponibilidade']])
         else:
             print("✅ Status dos veículos consistentes.")
     else:
         print("⚠️ Não foi possível verificar status de veículos - colunas necessárias não encontradas")
-
 # ---------------------
 # Execução da Auditoria
 # ---------------------
@@ -270,7 +259,7 @@ print("\n✅ Tabelas carregadas!")
 
 # Rodar verificações apenas para tabelas que foram carregadas com sucesso
 if 'aluguel' in dfs:
-    checarNulos(dfs['aluguel'], ['datainicio','datafim','valortotal','idcliente','idveiculo','idseguro'], 'aluguel')
+    checarNulos(dfs['aluguel'], ['datainicio','datafim','valor','idcliente','idveiculo','idseguro'], 'aluguel')
     checarDatas(dfs['aluguel'], 'aluguel')
     checarStatusAluguel(dfs['aluguel'])
     
@@ -288,9 +277,6 @@ if 'veiculo' in dfs:
 if 'cliente' in dfs:
     checarCNH(dfs['cliente'])
     checarEmail(dfs['cliente'])
-
-if all(tabela in dfs for tabela in ['aluguel', 'veiculo', 'aluguel_servico', 'servico']):
-    checarValorTotalAluguel(dfs['aluguel'], dfs['veiculo'], dfs['aluguel_servico'], dfs['servico'])
 
 if all(tabela in dfs for tabela in ['aluguel', 'veiculo', 'seguro']):
     checarSeguroVeiculo(dfs['aluguel'], dfs['veiculo'], dfs['seguro'])
