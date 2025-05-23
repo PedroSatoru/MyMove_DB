@@ -12,6 +12,7 @@ Banco de dados e gerador de dados para uma locadora de veículos utilizando Supa
   - [Modelo Relacional (3FN)](#modelo-relacional-3fn)
 - [Estrutura do Projeto](#estrutura-do-projeto)
 - [Como Executar](#como-executar)
+- [Teste de Consistencia](#teste-de-consistência)
 - [Queries SQL](#queries-sql)
 - [Equipe](#equipe)
 - [Observações](#observações)
